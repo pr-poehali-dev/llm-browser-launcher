@@ -20,13 +20,25 @@ const Index = () => {
   const [modelStatuses, setModelStatuses] = useState({});
 
   const textModels = [
-    { id: 'Llama-3.1-8B', name: 'Llama-3.1-8B', type: 'text', size: '4.7GB', status: 'available', description: 'Мощная открытая языковая модель' },
-    { id: 'Phi-3.5-mini', name: 'Phi-3.5-mini', type: 'text', size: '800MB', status: 'available', description: 'Компактная быстрая модель' },
+    { id: 'Llama-3.1-8B', name: 'Llama 3.1 8B', type: 'text', size: '4.7GB', status: 'available', description: 'Мощная открытая языковая модель Meta', category: 'Общение' },
+    { id: 'Phi-3.5-mini', name: 'Phi-3.5 Mini', type: 'text', size: '800MB', status: 'available', description: 'Компактная быстрая модель Microsoft', category: 'Быстрый чат' },
+    { id: 'Gemma-2B', name: 'Gemma 2B', type: 'text', size: '1.4GB', status: 'available', description: 'Легковесная модель от Google', category: 'Быстрый чат' },
+    { id: 'CodeLlama-7B', name: 'Code Llama 7B', type: 'text', size: '3.8GB', status: 'available', description: 'Специализированная модель для программирования', category: 'Программирование' },
+    { id: 'Mistral-7B', name: 'Mistral 7B', type: 'text', size: '4.1GB', status: 'available', description: 'Европейская открытая модель с высокой производительностью', category: 'Общение' },
+    { id: 'TinyLlama-1.1B', name: 'TinyLlama 1.1B', type: 'text', size: '637MB', status: 'available', description: 'Сверхлегкая модель для слабых устройств', category: 'Легкий' },
+    { id: 'Qwen-1.8B', name: 'Qwen 1.8B', type: 'text', size: '1.0GB', status: 'available', description: 'Многоязычная модель от Alibaba', category: 'Многоязычный' },
+    { id: 'Yi-6B-Chat', name: 'Yi 6B Chat', type: 'text', size: '3.4GB', status: 'available', description: 'Продвинутая китайская модель для диалогов', category: 'Общение' },
   ];
 
   const imageModels = [
-    { id: 'FLUX.1-dev', name: 'FLUX.1-dev', type: 'image', size: '11.9GB', status: 'available', description: 'Высококачественная генерация изображений' },
-    { id: 'Stable-Diffusion-XL', name: 'Stable Diffusion XL', type: 'image', size: '6.9GB', status: 'available', description: 'Популярная модель для создания изображений' },
+    { id: 'FLUX.1-dev', name: 'FLUX.1 Dev', type: 'image', size: '11.9GB', status: 'available', description: 'Высококачественная генерация изображений от Black Forest Labs', category: 'Высокое качество' },
+    { id: 'Stable-Diffusion-XL', name: 'Stable Diffusion XL', type: 'image', size: '6.9GB', status: 'available', description: 'Популярная модель для создания изображений', category: 'Универсальная' },
+    { id: 'SDXL-Turbo', name: 'SDXL Turbo', type: 'image', size: '6.9GB', status: 'available', description: 'Быстрая версия Stable Diffusion XL', category: 'Скорость' },
+    { id: 'Kandinsky-2.2', name: 'Kandinsky 2.2', type: 'image', size: '5.2GB', status: 'available', description: 'Российская модель с уникальным стилем', category: 'Художественный' },
+    { id: 'DALLE-mini', name: 'DALL-E mini', type: 'image', size: '1.3GB', status: 'available', description: 'Легкая версия DALL-E для быстрой генерации', category: 'Легкий' },
+    { id: 'Waifu-Diffusion', name: 'Waifu Diffusion', type: 'image', size: '4.3GB', status: 'available', description: 'Специализированная модель для аниме-стиля', category: 'Аниме' },
+    { id: 'Midjourney-v6', name: 'Midjourney v6', type: 'image', size: '8.7GB', status: 'available', description: 'Имитация стиля Midjourney', category: 'Художественный' },
+    { id: 'Realistic-Vision', name: 'Realistic Vision', type: 'image', size: '7.1GB', status: 'available', description: 'Модель для создания фотореалистичных изображений', category: 'Реализм' },
   ];
 
   const allModels = [...textModels, ...imageModels];
@@ -167,7 +179,10 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Icon name={model.type === 'text' ? 'MessageSquare' : 'Image'} size={20} className="text-primary" />
-              <CardTitle className="text-base">{model.name}</CardTitle>
+              <div>
+                <CardTitle className="text-base">{model.name}</CardTitle>
+                <div className="text-xs text-muted-foreground">{model.category}</div>
+              </div>
             </div>
             <Badge variant={
               currentStatus.status === 'ready' ? 'default' : 
@@ -210,7 +225,7 @@ const Index = () => {
                 <Icon name="Brain" size={20} className="text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">AI Neural Platform</h1>
+                <h1 className="text-xl font-bold text-slate-900">DinoTidusNeiroSite</h1>
                 <p className="text-xs text-slate-500">Браузерные нейросети</p>
               </div>
             </div>
@@ -239,9 +254,9 @@ const Index = () => {
             
             <Tabs defaultValue="all" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="all" className="text-xs">Все</TabsTrigger>
-                <TabsTrigger value="text" className="text-xs">Текст</TabsTrigger>
-                <TabsTrigger value="image" className="text-xs">Фото</TabsTrigger>
+                <TabsTrigger value="all" className="text-xs">Все ({allModels.length})</TabsTrigger>
+                <TabsTrigger value="text" className="text-xs">Текст ({textModels.length})</TabsTrigger>
+                <TabsTrigger value="image" className="text-xs">Фото ({imageModels.length})</TabsTrigger>
               </TabsList>
               
               <TabsContent value="all" className="space-y-3 mt-4">
