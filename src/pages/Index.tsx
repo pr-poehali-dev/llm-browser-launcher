@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
+import { aiModelManager } from '@/lib/aiModels';
 
 const Index = () => {
   const [activeModel, setActiveModel] = useState(null);
@@ -16,86 +17,187 @@ const Index = () => {
   const [generatedImages, setGeneratedImages] = useState([]);
   const [imagePrompt, setImagePrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [modelStatuses, setModelStatuses] = useState({});
 
   const textModels = [
-    { id: 1, name: 'GPT-4o-mini', type: 'text', size: '1.2GB', status: 'ready', description: 'Быстрая языковая модель для чата' },
-    { id: 2, name: 'Claude-3-Haiku', type: 'text', size: '800MB', status: 'downloading', progress: 65, description: 'Компактная модель для диалогов' },
-    { id: 3, name: 'Llama-3.1-8B', type: 'text', size: '4.7GB', status: 'available', description: 'Мощная открытая языковая модель' },
+    { id: 'Llama-3.1-8B', name: 'Llama-3.1-8B', type: 'text', size: '4.7GB', status: 'available', description: 'Мощная открытая языковая модель' },
+    { id: 'Phi-3.5-mini', name: 'Phi-3.5-mini', type: 'text', size: '800MB', status: 'available', description: 'Компактная быстрая модель' },
   ];
 
   const imageModels = [
-    { id: 4, name: 'FLUX.1-dev', type: 'image', size: '11.9GB', status: 'ready', description: 'Высококачественная генерация изображений' },
-    { id: 5, name: 'Stable Diffusion XL', type: 'image', size: '6.9GB', status: 'available', description: 'Популярная модель для создания изображений' },
-    { id: 6, name: 'DALL-E 3', type: 'image', size: '8.2GB', status: 'downloading', progress: 23, description: 'Продвинутый генератор изображений' },
+    { id: 'FLUX.1-dev', name: 'FLUX.1-dev', type: 'image', size: '11.9GB', status: 'available', description: 'Высококачественная генерация изображений' },
+    { id: 'Stable-Diffusion-XL', name: 'Stable Diffusion XL', type: 'image', size: '6.9GB', status: 'available', description: 'Популярная модель для создания изображений' },
   ];
 
   const allModels = [...textModels, ...imageModels];
 
-  const sendMessage = () => {
+  useEffect(() => {
+    // Инициализируем статусы моделей
+    const initialStatuses = {};
+    allModels.forEach(model => {
+      initialStatuses[model.id] = {
+        status: 'available',
+        progress: 0
+      };
+    });
+    setModelStatuses(initialStatuses);
+  }, []);
+
+  const sendMessage = async () => {
     if (inputMessage.trim() && activeModel) {
       setChatMessages(prev => [...prev, { role: 'user', content: inputMessage }]);
       setIsLoading(true);
       
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: `Ответ от модели ${activeModel.name}: Это демо-ответ на ваше сообщение "${inputMessage}"` }]);
+      try {
+        // Проверяем, что модель загружена
+        if (modelStatuses[activeModel.id]?.status !== 'ready') {
+          // Начинаем загрузку модели
+          setModelStatuses(prev => ({
+            ...prev,
+            [activeModel.id]: { status: 'downloading', progress: 0 }
+          }));
+
+          // Устанавливаем callback для отслеживания прогресса
+          aiModelManager.setDownloadCallback(activeModel.id, (progress) => {
+            setModelStatuses(prev => ({
+              ...prev,
+              [activeModel.id]: { status: 'downloading', progress }
+            }));
+          });
+        }
+
+        const response = await aiModelManager.generateText(activeModel.id, inputMessage);
+        
+        setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
+        
+        // Обновляем статус модели как готовую
+        setModelStatuses(prev => ({
+          ...prev,
+          [activeModel.id]: { status: 'ready', progress: 100 }
+        }));
+        
+      } catch (error) {
+        console.error('Ошибка отправки сообщения:', error);
+        setChatMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `Ошибка: ${error.message}. Убедитесь, что WebGPU поддерживается в вашем браузере.` 
+        }]);
+        
+        setModelStatuses(prev => ({
+          ...prev,
+          [activeModel.id]: { status: 'error', progress: 0 }
+        }));
+      } finally {
         setIsLoading(false);
-      }, 1500);
-      
-      setInputMessage('');
+        setInputMessage('');
+        aiModelManager.removeDownloadCallback(activeModel.id);
+      }
     }
   };
 
-  const generateImage = () => {
+  const generateImage = async () => {
     if (imagePrompt.trim() && activeModel?.type === 'image') {
       setIsLoading(true);
       
-      setTimeout(() => {
+      try {
+        // Проверяем, что модель загружена
+        if (modelStatuses[activeModel.id]?.status !== 'ready') {
+          setModelStatuses(prev => ({
+            ...prev,
+            [activeModel.id]: { status: 'downloading', progress: 0 }
+          }));
+
+          aiModelManager.setDownloadCallback(activeModel.id, (progress) => {
+            setModelStatuses(prev => ({
+              ...prev,
+              [activeModel.id]: { status: 'downloading', progress }
+            }));
+          });
+        }
+
+        const imageUrl = await aiModelManager.generateImage(activeModel.id, imagePrompt);
+        
+        const newImage = {
+          id: Date.now(),
+          prompt: imagePrompt,
+          url: imageUrl,
+          model: activeModel.name
+        };
+        
+        setGeneratedImages(prev => [newImage, ...prev]);
+        
+        setModelStatuses(prev => ({
+          ...prev,
+          [activeModel.id]: { status: 'ready', progress: 100 }
+        }));
+        
+      } catch (error) {
+        console.error('Ошибка генерации изображения:', error);
+        
+        // Показываем placeholder в случае ошибки
         const newImage = {
           id: Date.now(),
           prompt: imagePrompt,
           url: 'https://v3.fal.media/files/rabbit/eaSJ0ghtmgQdr9ebB9M_y_output.png',
-          model: activeModel.name
+          model: activeModel.name,
+          error: `Ошибка: ${error.message}`
         };
         setGeneratedImages(prev => [newImage, ...prev]);
+        
+        setModelStatuses(prev => ({
+          ...prev,
+          [activeModel.id]: { status: 'error', progress: 0 }
+        }));
+      } finally {
         setIsLoading(false);
-      }, 3000);
-      
-      setImagePrompt('');
+        setImagePrompt('');
+        aiModelManager.removeDownloadCallback(activeModel.id);
+      }
     }
   };
 
-  const ModelCard = ({ model }) => (
-    <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${
-      activeModel?.id === model.id ? 'ring-2 ring-primary border-primary' : ''
-    }`} onClick={() => setActiveModel(model)}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon name={model.type === 'text' ? 'MessageSquare' : 'Image'} size={20} className="text-primary" />
-            <CardTitle className="text-base">{model.name}</CardTitle>
-          </div>
-          <Badge variant={model.status === 'ready' ? 'default' : model.status === 'downloading' ? 'secondary' : 'outline'}>
-            {model.status === 'ready' ? 'Готово' : model.status === 'downloading' ? 'Загрузка' : 'Доступно'}
-          </Badge>
-        </div>
-        <CardDescription className="text-sm">{model.description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Размер: {model.size}</span>
-            <span className="capitalize">{model.type === 'text' ? 'Текст' : 'Изображения'}</span>
-          </div>
-          {model.status === 'downloading' && (
-            <div className="space-y-1">
-              <Progress value={model.progress} className="h-2" />
-              <div className="text-xs text-muted-foreground text-center">{model.progress}%</div>
+  const ModelCard = ({ model }) => {
+    const currentStatus = modelStatuses[model.id] || { status: 'available', progress: 0 };
+    
+    return (
+      <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] ${
+        activeModel?.id === model.id ? 'ring-2 ring-primary border-primary' : ''
+      }`} onClick={() => setActiveModel(model)}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Icon name={model.type === 'text' ? 'MessageSquare' : 'Image'} size={20} className="text-primary" />
+              <CardTitle className="text-base">{model.name}</CardTitle>
             </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
+            <Badge variant={
+              currentStatus.status === 'ready' ? 'default' : 
+              currentStatus.status === 'downloading' ? 'secondary' : 
+              currentStatus.status === 'error' ? 'destructive' : 'outline'
+            }>
+              {currentStatus.status === 'ready' ? 'Готово' : 
+               currentStatus.status === 'downloading' ? 'Загрузка' : 
+               currentStatus.status === 'error' ? 'Ошибка' : 'Доступно'}
+            </Badge>
+          </div>
+          <CardDescription className="text-sm">{model.description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Размер: {model.size}</span>
+              <span className="capitalize">{model.type === 'text' ? 'Текст' : 'Изображения'}</span>
+            </div>
+            {currentStatus.status === 'downloading' && (
+              <div className="space-y-1">
+                <Progress value={currentStatus.progress} className="h-2" />
+                <div className="text-xs text-muted-foreground text-center">{currentStatus.progress}%</div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -225,9 +327,9 @@ const Index = () => {
                       onChange={(e) => setInputMessage(e.target.value)}
                       placeholder="Введите ваше сообщение..."
                       onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                      disabled={activeModel.status !== 'ready'}
+                      disabled={isLoading}
                     />
-                    <Button onClick={sendMessage} disabled={activeModel.status !== 'ready' || isLoading}>
+                    <Button onClick={sendMessage} disabled={isLoading}>
                       <Icon name="Send" size={16} />
                     </Button>
                   </div>
@@ -257,11 +359,11 @@ const Index = () => {
                         onChange={(e) => setImagePrompt(e.target.value)}
                         placeholder="Опишите изображение, которое хотите создать..."
                         rows={3}
-                        disabled={activeModel.status !== 'ready'}
+                        disabled={isLoading}
                       />
                       <Button 
                         onClick={generateImage} 
-                        disabled={activeModel.status !== 'ready' || isLoading}
+                        disabled={isLoading}
                         className="self-end"
                       >
                         {isLoading ? (
